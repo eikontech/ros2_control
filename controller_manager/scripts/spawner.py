@@ -99,7 +99,7 @@ def main(args=None):
         action='store_true')
     parser.add_argument(
         '--controller-manager-timeout',
-        help='Time to wait for the controller manager', required=False, default=10, type=int)
+        help='Time to wait for the controller manager', required=False, default=20, type=int)
 
     command_line_args = rclpy.utilities.remove_ros_args(args=sys.argv)[1:]
     args = parser.parse_args(command_line_args)

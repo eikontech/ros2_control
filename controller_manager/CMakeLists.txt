@@ -1,16 +1,12 @@
 cmake_minimum_required(VERSION 3.5)
 project(controller_manager)
 
-# Default to C++14
-if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
-endif()
-
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra)
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(ament_cmake_core REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(controller_interface REQUIRED)
@@ -34,8 +30,6 @@ ament_target_dependencies(controller_manager
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(controller_manager PRIVATE "CONTROLLER_MANAGER_BUILDING_DLL")
-# prevent pluginlib from using boost
-target_compile_definitions(controller_manager PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
 
 add_executable(ros2_control_node src/ros2_control_node.cpp)
 target_include_directories(ros2_control_node PRIVATE include)
@@ -60,17 +54,16 @@ install(DIRECTORY include/
   DESTINATION include
 )
 
-install(PROGRAMS
-  scripts/spawner.py
-  scripts/unspawner.py
-  DESTINATION lib/${PROJECT_NAME}
-)
-
 if(BUILD_TESTING)
   find_package(ament_cmake_gmock REQUIRED)
   find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_lint_auto REQUIRED)
+  find_package(ros2_control_test_assets REQUIRED)
 
+  list(APPEND AMENT_LINT_AUTO_EXCLUDE
+    ament_cmake_uncrustify
+    ament_cmake_cpplint
+  )
   ament_lint_auto_find_test_dependencies()
 
   ament_index_get_prefix_path(ament_index_build_path SKIP_AMENT_PREFIX_PATH)
@@ -107,6 +100,7 @@ if(BUILD_TESTING)
   )
   target_include_directories(test_controller_manager PRIVATE include)
   target_link_libraries(test_controller_manager controller_manager test_controller)
+  ament_target_dependencies(test_controller_manager ros2_control_test_assets)
 
   ament_add_gmock(
     test_load_controller
@@ -115,6 +109,7 @@ if(BUILD_TESTING)
   )
   target_include_directories(test_load_controller PRIVATE include)
   target_link_libraries(test_load_controller controller_manager test_controller test_controller_failed_init)
+  ament_target_dependencies(test_load_controller ros2_control_test_assets)
 
   ament_add_gmock(
     test_controller_manager_srvs
@@ -126,6 +121,7 @@ if(BUILD_TESTING)
   ament_target_dependencies(
     test_controller_manager_srvs
     controller_manager_msgs
+    ros2_control_test_assets
   )
 
   add_library(test_controller_with_interfaces SHARED test/test_controller_with_interfaces/test_controller_with_interfaces.cpp)
@@ -145,6 +141,7 @@ if(BUILD_TESTING)
   )
   target_include_directories(test_release_interfaces PRIVATE include)
   target_link_libraries(test_release_interfaces controller_manager test_controller_with_interfaces)
+  ament_target_dependencies(test_release_interfaces ros2_control_test_assets)
 
   ament_add_gmock(
     test_spawner_unspawner
@@ -152,10 +149,19 @@ if(BUILD_TESTING)
   )
   target_include_directories(test_spawner_unspawner PRIVATE include)
   target_link_libraries(test_spawner_unspawner controller_manager test_controller)
+  ament_target_dependencies(test_spawner_unspawner ros2_control_test_assets)
+
+  ament_add_gmock(
+    test_hardware_management_srvs
+    test/test_hardware_management_srvs.cpp
+  )
+  target_include_directories(test_hardware_management_srvs PRIVATE include)
+  target_link_libraries(test_hardware_management_srvs controller_manager test_controller)
+  ament_target_dependencies(test_hardware_management_srvs ros2_control_test_assets)
 endif()
 
 # Install Python modules
-ament_python_install_package(${PROJECT_NAME})
+ament_python_install_package(${PROJECT_NAME} SCRIPTS_DESTINATION lib/${PROJECT_NAME})
 
 ament_export_libraries(
   controller_manager

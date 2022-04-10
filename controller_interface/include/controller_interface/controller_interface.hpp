@@ -23,28 +23,17 @@
 
 #include "hardware_interface/loaned_command_interface.hpp"
 #include "hardware_interface/loaned_state_interface.hpp"
-#include "lifecycle_msgs/msg/state.hpp"
 
 #include "rclcpp/rclcpp.hpp"
-#include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
+#include "rclcpp_lifecycle/lifecycle_node.hpp"
 
 namespace controller_interface
 {
-
-// TODO(karsten1987): Remove clang pragma within Galactic
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wc++17-extensions"
-#endif
 enum class return_type : std::uint8_t
 {
   OK = 0,
   ERROR = 1,
-  SUCCESS [[deprecated("Use controller_interface::return_type::OK instead.")]] = OK
 };
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
 
 /// Indicating which interfaces are to be claimed.
 /**
@@ -73,16 +62,13 @@ public:
   ControllerInterface() = default;
 
   CONTROLLER_INTERFACE_PUBLIC
-  virtual
-  ~ControllerInterface() = default;
+  virtual ~ControllerInterface() = default;
 
   CONTROLLER_INTERFACE_PUBLIC
-  virtual
-  InterfaceConfiguration command_interface_configuration() const = 0;
+  virtual InterfaceConfiguration command_interface_configuration() const = 0;
 
   CONTROLLER_INTERFACE_PUBLIC
-  virtual
-  InterfaceConfiguration state_interface_configuration() const = 0;
+  virtual InterfaceConfiguration state_interface_configuration() const = 0;
 
   CONTROLLER_INTERFACE_PUBLIC
   void assign_interfaces(
@@ -93,57 +79,56 @@ public:
   void release_interfaces();
 
   CONTROLLER_INTERFACE_PUBLIC
-  virtual
-  return_type
-  init(const std::string & controller_name);
+  virtual return_type init(const std::string & controller_name);
 
-  CONTROLLER_INTERFACE_PUBLIC
-  virtual
-  return_type
-  init(const std::string & controller_name, rclcpp::NodeOptions & node_options);
-
-  CONTROLLER_INTERFACE_PUBLIC
-  virtual
-  return_type
-  update() = 0;
-
-  CONTROLLER_INTERFACE_PUBLIC
-  std::shared_ptr<rclcpp::Node>
-  get_node();
-
-  /**
-   * The methods below are a substitute to the LifecycleNode methods with the same name.
-   * The Life cycle is shown in ROS2 design document:
-   * https://design.ros2.org/articles/node_lifecycle.html
-   * We cannot use a LifecycleNode because it would expose change-state services to the rest
-   * of the ROS system.
-   * Only the Controller Manager should have possibility to change state of a controller.
-   *
-   * Hopefully in the future we can use a LifecycleNode where we disable modifications from the outside.
+  /// Custom configure method to read additional parameters for controller-nodes
+  /*
+   * Override default implementation for configure of LifecycleNode to get parameters.
    */
   CONTROLLER_INTERFACE_PUBLIC
   const rclcpp_lifecycle::State & configure();
 
+  /// Extending interface with initialization method which is individual for each controller
   CONTROLLER_INTERFACE_PUBLIC
-  const rclcpp_lifecycle::State & cleanup();
+  virtual LifecycleNodeInterface::CallbackReturn on_init() = 0;
 
   CONTROLLER_INTERFACE_PUBLIC
-  const rclcpp_lifecycle::State & deactivate();
+  virtual return_type update(const rclcpp::Time & time, const rclcpp::Duration & period) = 0;
 
   CONTROLLER_INTERFACE_PUBLIC
-  const rclcpp_lifecycle::State & activate();
+  std::shared_ptr<rclcpp_lifecycle::LifecycleNode> get_node();
 
   CONTROLLER_INTERFACE_PUBLIC
-  const rclcpp_lifecycle::State & shutdown();
+  const rclcpp_lifecycle::State & get_state() const;
 
   CONTROLLER_INTERFACE_PUBLIC
-  const rclcpp_lifecycle::State & get_current_state() const;
+  unsigned int get_update_rate() const;
+
+  /// Declare and initialize a parameter with a type.
+  /**
+   *
+   * Wrapper function for templated node's declare_parameter() which checks if
+   * parameter is already declared.
+   * For use in all components that inherit from ControllerInterface
+   */
+  template <typename ParameterT>
+  auto auto_declare(const std::string & name, const ParameterT & default_value)
+  {
+    if (!node_->has_parameter(name))
+    {
+      return node_->declare_parameter<ParameterT>(name, default_value);
+    }
+    else
+    {
+      return node_->get_parameter(name).get_value<ParameterT>();
+    }
+  }
 
 protected:
   std::vector<hardware_interface::LoanedCommandInterface> command_interfaces_;
   std::vector<hardware_interface::LoanedStateInterface> state_interfaces_;
-  std::shared_ptr<rclcpp::Node> node_;
-  rclcpp_lifecycle::State lifecycle_state_;
+  std::shared_ptr<rclcpp_lifecycle::LifecycleNode> node_;
+  unsigned int update_rate_ = 0;
 };
 
 using ControllerInterfaceSharedPtr = std::shared_ptr<ControllerInterface>;

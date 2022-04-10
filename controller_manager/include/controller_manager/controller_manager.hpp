@@ -26,13 +26,15 @@
 #include "controller_manager/visibility_control.h"
 #include "controller_manager_msgs/srv/configure_controller.hpp"
 #include "controller_manager_msgs/srv/configure_start_controller.hpp"
-#include "controller_manager_msgs/srv/list_controllers.hpp"
 #include "controller_manager_msgs/srv/list_controller_types.hpp"
+#include "controller_manager_msgs/srv/list_controllers.hpp"
+#include "controller_manager_msgs/srv/list_hardware_components.hpp"
 #include "controller_manager_msgs/srv/list_hardware_interfaces.hpp"
-#include "controller_manager_msgs/srv/load_controller.hpp"
 #include "controller_manager_msgs/srv/load_configure_controller.hpp"
+#include "controller_manager_msgs/srv/load_controller.hpp"
 #include "controller_manager_msgs/srv/load_start_controller.hpp"
 #include "controller_manager_msgs/srv/reload_controller_libraries.hpp"
+#include "controller_manager_msgs/srv/set_hardware_component_state.hpp"
 #include "controller_manager_msgs/srv/switch_controller.hpp"
 #include "controller_manager_msgs/srv/unload_controller.hpp"
 
@@ -45,12 +47,11 @@
 
 namespace controller_manager
 {
-
 class ControllerManager : public rclcpp::Node
 {
 public:
   static constexpr bool kWaitForAllResources = false;
-  static constexpr double kInfiniteTimeout = 0.0;
+  static constexpr auto kInfiniteTimeout = 0;
 
   CONTROLLER_MANAGER_PUBLIC
   ControllerManager(
@@ -66,14 +67,14 @@ public:
     const std::string & namespace_ = "");
 
   CONTROLLER_MANAGER_PUBLIC
-  virtual
-  ~ControllerManager() = default;
+  virtual ~ControllerManager() = default;
 
   CONTROLLER_MANAGER_PUBLIC
-  controller_interface::ControllerInterfaceSharedPtr
-  load_controller(
-    const std::string & controller_name,
-    const std::string & controller_type);
+  void init_resource_manager(const std::string & robot_description);
+
+  CONTROLLER_MANAGER_PUBLIC
+  controller_interface::ControllerInterfaceSharedPtr load_controller(
+    const std::string & controller_name, const std::string & controller_type);
 
   /// load_controller loads a controller by name, the type must be defined in the parameter server.
   /**
@@ -82,8 +83,8 @@ public:
    * \see Documentation in controller_manager_msgs/LoadController.srv
    */
   CONTROLLER_MANAGER_PUBLIC
-  controller_interface::ControllerInterfaceSharedPtr
-  load_controller(const std::string & controller_name);
+  controller_interface::ControllerInterfaceSharedPtr load_controller(
+    const std::string & controller_name);
 
   CONTROLLER_MANAGER_PUBLIC
   controller_interface::return_type unload_controller(const std::string & controller_name);
@@ -91,12 +92,11 @@ public:
   CONTROLLER_MANAGER_PUBLIC
   std::vector<ControllerSpec> get_loaded_controllers() const;
 
-  template<
-    typename T,
-    typename std::enable_if<std::is_convertible<
-      T *, controller_interface::ControllerInterface *>::value, T>::type * = nullptr>
-  controller_interface::ControllerInterfaceSharedPtr
-  add_controller(
+  template <
+    typename T, typename std::enable_if<
+                  std::is_convertible<T *, controller_interface::ControllerInterface *>::value,
+                  T>::type * = nullptr>
+  controller_interface::ControllerInterfaceSharedPtr add_controller(
     std::shared_ptr<T> controller, const std::string & controller_name,
     const std::string & controller_type)
   {
@@ -114,8 +114,7 @@ public:
    * \see Documentation in controller_manager_msgs/ConfigureController.srv
    */
   CONTROLLER_MANAGER_PUBLIC
-  controller_interface::return_type
-  configure_controller(const std::string & controller_name);
+  controller_interface::return_type configure_controller(const std::string & controller_name);
 
   /// switch_controller Stops some controllers and start others.
   /**
@@ -125,20 +124,18 @@ public:
    * \see Documentation in controller_manager_msgs/SwitchController.srv
    */
   CONTROLLER_MANAGER_PUBLIC
-  controller_interface::return_type
-  switch_controller(
+  controller_interface::return_type switch_controller(
     const std::vector<std::string> & start_controllers,
-    const std::vector<std::string> & stop_controllers,
-    int strictness,
+    const std::vector<std::string> & stop_controllers, int strictness,
     bool start_asap = kWaitForAllResources,
-    const rclcpp::Duration & timeout =
-    rclcpp::Duration(static_cast<rcl_duration_value_t>(kInfiniteTimeout)));
+    const rclcpp::Duration & timeout = rclcpp::Duration::from_nanoseconds(kInfiniteTimeout));
 
   CONTROLLER_MANAGER_PUBLIC
   void read();
 
   CONTROLLER_MANAGER_PUBLIC
-  controller_interface::return_type update();
+  controller_interface::return_type update(
+    const rclcpp::Time & time, const rclcpp::Duration & period);
 
   CONTROLLER_MANAGER_PUBLIC
   void write();
@@ -152,13 +149,17 @@ public:
   // the executor (see issue #260).
   // rclcpp::CallbackGroup::SharedPtr deterministic_callback_group_;
 
+  // Per controller update rate support
+  CONTROLLER_MANAGER_PUBLIC
+  unsigned int get_update_rate() const;
+
 protected:
   CONTROLLER_MANAGER_PUBLIC
   void init_services();
 
   CONTROLLER_MANAGER_PUBLIC
-  controller_interface::ControllerInterfaceSharedPtr
-  add_controller_impl(const ControllerSpec & controller);
+  controller_interface::ControllerInterfaceSharedPtr add_controller_impl(
+    const ControllerSpec & controller);
 
   CONTROLLER_MANAGER_PUBLIC
   void manage_switch();
@@ -176,11 +177,6 @@ protected:
   void list_controllers_srv_cb(
     const std::shared_ptr<controller_manager_msgs::srv::ListControllers::Request> request,
     std::shared_ptr<controller_manager_msgs::srv::ListControllers::Response> response);
-
-  CONTROLLER_MANAGER_PUBLIC
-  void list_controller_types_srv_cb(
-    const std::shared_ptr<controller_manager_msgs::srv::ListControllerTypes::Request> request,
-    std::shared_ptr<controller_manager_msgs::srv::ListControllerTypes::Response> response);
 
   CONTROLLER_MANAGER_PUBLIC
   void list_hardware_interfaces_srv_cb(
@@ -227,6 +223,25 @@ protected:
     const std::shared_ptr<controller_manager_msgs::srv::UnloadController::Request> request,
     std::shared_ptr<controller_manager_msgs::srv::UnloadController::Response> response);
 
+  CONTROLLER_MANAGER_PUBLIC
+  void list_controller_types_srv_cb(
+    const std::shared_ptr<controller_manager_msgs::srv::ListControllerTypes::Request> request,
+    std::shared_ptr<controller_manager_msgs::srv::ListControllerTypes::Response> response);
+
+  CONTROLLER_MANAGER_PUBLIC
+  void list_hardware_components_srv_cb(
+    const std::shared_ptr<controller_manager_msgs::srv::ListHardwareComponents::Request> request,
+    std::shared_ptr<controller_manager_msgs::srv::ListHardwareComponents::Response> response);
+
+  CONTROLLER_MANAGER_PUBLIC
+  void set_hardware_component_state_srv_cb(
+    const std::shared_ptr<controller_manager_msgs::srv::SetHardwareComponentState::Request> request,
+    std::shared_ptr<controller_manager_msgs::srv::SetHardwareComponentState::Response> response);
+
+  // Per controller update rate support
+  unsigned int update_loop_counter_ = 0;
+  unsigned int update_rate_ = 100;
+
 private:
   std::vector<std::string> get_controller_names();
 
@@ -256,9 +271,9 @@ private:
    */
   class RTControllerListWrapper
   {
-// *INDENT-OFF*
+    // *INDENT-OFF*
   public:
-// *INDENT-ON*
+    // *INDENT-ON*
     /// update_and_get_used_by_rt_list Makes the "updated" list the "used by rt" list
     /**
      * \warning Should only be called by the RT thread, no one should modify the
@@ -296,9 +311,9 @@ private:
     // must be acquired before using any list other than the "used by rt"
     mutable std::recursive_mutex controllers_lock_;
 
-// *INDENT-OFF*
+    // *INDENT-OFF*
   private:
-// *INDENT-ON*
+    // *INDENT-ON*
     /// get_other_list get the list not pointed by index
     /**
      * \param[in] index int
@@ -306,8 +321,7 @@ private:
     int get_other_list(int index) const;
 
     void wait_until_rt_not_using(
-      int index,
-      std::chrono::microseconds sleep_delay = std::chrono::microseconds(200)) const;
+      int index, std::chrono::microseconds sleep_delay = std::chrono::microseconds(200)) const;
 
     std::vector<ControllerSpec> controllers_lists_[2];
     /// The index of the controller list with the most updated information
@@ -324,10 +338,7 @@ private:
     list_controllers_service_;
   rclcpp::Service<controller_manager_msgs::srv::ListControllerTypes>::SharedPtr
     list_controller_types_service_;
-  rclcpp::Service<controller_manager_msgs::srv::ListHardwareInterfaces>::SharedPtr
-    list_hardware_interfaces_service_;
-  rclcpp::Service<controller_manager_msgs::srv::LoadController>::SharedPtr
-    load_controller_service_;
+  rclcpp::Service<controller_manager_msgs::srv::LoadController>::SharedPtr load_controller_service_;
   rclcpp::Service<controller_manager_msgs::srv::ConfigureController>::SharedPtr
     configure_controller_service_;
   rclcpp::Service<controller_manager_msgs::srv::LoadConfigureController>::SharedPtr
@@ -342,6 +353,13 @@ private:
     switch_controller_service_;
   rclcpp::Service<controller_manager_msgs::srv::UnloadController>::SharedPtr
     unload_controller_service_;
+
+  rclcpp::Service<controller_manager_msgs::srv::ListHardwareComponents>::SharedPtr
+    list_hardware_components_service_;
+  rclcpp::Service<controller_manager_msgs::srv::ListHardwareInterfaces>::SharedPtr
+    list_hardware_interfaces_service_;
+  rclcpp::Service<controller_manager_msgs::srv::SetHardwareComponentState>::SharedPtr
+    set_hardware_component_state_service_;
 
   std::vector<std::string> start_request_, stop_request_;
   std::vector<std::string> start_command_interface_request_, stop_command_interface_request_;

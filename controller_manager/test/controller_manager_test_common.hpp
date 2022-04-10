@@ -30,172 +30,166 @@
 #include "controller_manager_msgs/srv/switch_controller.hpp"
 
 #include "rclcpp/utilities.hpp"
-#include "test_controller/test_controller.hpp"
+
+#include "ros2_control_test_assets/descriptions.hpp"
 #include "test_controller_failed_init/test_controller_failed_init.hpp"
 
 constexpr auto STRICT = controller_manager_msgs::srv::SwitchController::Request::STRICT;
 constexpr auto BEST_EFFORT = controller_manager_msgs::srv::SwitchController::Request::BEST_EFFORT;
 
-namespace controller_manager_test
-{
-constexpr auto urdf =
-  R"(
-<?xml version="1.0" encoding="utf-8"?>
-<robot name="MinimalRobot">
-  <joint name="base_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0"/>
-    <parent link="world"/>
-    <child link="base_link"/>
-  </joint>
-  <link name="base_link">
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <cylinder length="1" radius="0.1"/>
-      </geometry>
-    </collision>
-  </link>
-  <joint name="joint1" type="revolute">
-    <origin rpy="-1.57079632679 0 0" xyz="0 0 0.2"/>
-    <parent link="base_link"/>
-    <child link="link1"/>
-    <limit effort="0.1" lower="-3.14159265359" upper="3.14159265359" velocity="0.2"/>
-  </joint>
-  <link name="link1">
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <cylinder length="1" radius="0.1"/>
-      </geometry>
-    </collision>
-  </link>
-  <joint name="joint2" type="revolute">
-    <origin rpy="1.57079632679 0 0" xyz="0 0 0.9"/>
-    <parent link="link1"/>
-    <child link="link2"/>
-    <limit effort="0.1" lower="-3.14159265359" upper="3.14159265359" velocity="0.2"/>
-  </joint>
-  <link name="link2">
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <cylinder length="1" radius="0.1"/>
-      </geometry>
-    </collision>
-  </link>
-  <joint name="tool_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 1"/>
-    <parent link="link2"/>
-    <child link="tool_link"/>
-  </joint>
-  <ros2_control name="TestActuatorHardware" type="actuator">
-    <hardware>
-      <plugin>test_actuator</plugin>
-    </hardware>
-    <joint name="joint1">
-      <command_interface name="position"/>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-  </ros2_control>
-  <ros2_control name="TestSensorHardware" type="sensor">
-    <hardware>
-      <plugin>test_sensor</plugin>
-      <param name="example_param_write_for_sec">2</param>
-      <param name="example_param_read_for_sec">2</param>
-    </hardware>
-    <sensor name="sensor1">
-      <state_interface name="velocity"/>
-    </sensor>
-  </ros2_control>
-  <ros2_control name="TestSystemHardware" type="system">
-    <hardware>
-      <plugin>test_system</plugin>
-      <param name="example_param_write_for_sec">2</param>
-      <param name="example_param_read_for_sec">2</param>
-    </hardware>
-    <joint name="joint2">
-      <command_interface name="velocity"/>
-      <state_interface name="position"/>
-    </joint>
-    <joint name="joint3">
-      <command_interface name="velocity"/>
-      <state_interface name="position"/>
-    </joint>
-  </ros2_control>
-</robot>
-)";
-}  // namespace controller_manager_test
+const auto TEST_CM_NAME = "test_controller_manager";
 
+// Strictness structure for parameterized tests - shared between different tests
+struct Strictness
+{
+  int strictness = STRICT;
+  controller_interface::return_type expected_return;
+  unsigned int expected_counter;
+};
+Strictness strict{STRICT, controller_interface::return_type::ERROR, 0u};
+Strictness best_effort{BEST_EFFORT, controller_interface::return_type::OK, 1u};
+
+// Forward definition to avid compile error - defined at the end of the file
+template <typename CtrlMgr>
+class ControllerManagerRunner;
+
+template <typename CtrlMgr>
 class ControllerManagerFixture : public ::testing::Test
 {
 public:
-  static void SetUpTestCase()
-  {
-    rclcpp::init(0, nullptr);
-  }
+  static void SetUpTestCase() { rclcpp::init(0, nullptr); }
 
-  static void TearDownTestCase()
-  {
-    rclcpp::shutdown();
-  }
+  static void TearDownTestCase() { rclcpp::shutdown(); }
 
   void SetUp()
   {
     executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
-    cm_ = std::make_shared<controller_manager::ControllerManager>(
-      std::make_unique<hardware_interface::ResourceManager>(controller_manager_test::urdf),
-      executor_, "test_controller_manager");
+    cm_ = std::make_shared<CtrlMgr>(
+      std::make_unique<hardware_interface::ResourceManager>(
+        ros2_control_test_assets::minimal_robot_urdf, true, true),
+      executor_, TEST_CM_NAME);
     run_updater_ = false;
   }
 
-  void TearDown()
-  {
-    stopCmUpdater();
-  }
+  void TearDown() { stopCmUpdater(); }
 
   void startCmUpdater()
   {
     run_updater_ = true;
-    updater_ = std::thread(
-      [&](void) -> void {
-        while (run_updater_) {
-          cm_->update();
-          std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-      });
+    updater_ = std::thread([&](void) -> void {
+      while (run_updater_)
+      {
+        cm_->update(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.01));
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+    });
   }
 
   void stopCmUpdater()
   {
-    if (run_updater_) {
+    if (run_updater_)
+    {
       run_updater_ = false;
       updater_.join();
     }
   }
 
+  void switch_test_controllers(
+    const std::vector<std::string> & start_controllers,
+    const std::vector<std::string> & stop_controllers, const int strictness,
+    const std::future_status expected_future_status = std::future_status::timeout,
+    const controller_interface::return_type expected_return = controller_interface::return_type::OK)
+  {
+    // First activation not possible because controller not configured
+    auto switch_future = std::async(
+      std::launch::async, &controller_manager::ControllerManager::switch_controller, cm_,
+      start_controllers, stop_controllers, strictness, true, rclcpp::Duration(0, 0));
+
+    ASSERT_EQ(expected_future_status, switch_future.wait_for(std::chrono::milliseconds(100)))
+      << "switch_controller should be blocking until next update cycle";
+    ControllerManagerRunner<CtrlMgr> cm_runner(this);
+    EXPECT_EQ(expected_return, switch_future.get());
+  }
+
   std::shared_ptr<rclcpp::Executor> executor_;
-  std::shared_ptr<controller_manager::ControllerManager> cm_;
+  std::shared_ptr<CtrlMgr> cm_;
 
   std::thread updater_;
   bool run_updater_;
 };
 
+class TestControllerManagerSrvs
+: public ControllerManagerFixture<controller_manager::ControllerManager>
+{
+public:
+  TestControllerManagerSrvs() {}
+
+  void SetUp() override
+  {
+    ControllerManagerFixture::SetUp();
+    SetUpSrvsCMExecutor();
+  }
+
+  void SetUpSrvsCMExecutor()
+  {
+    update_timer_ = cm_->create_wall_timer(std::chrono::milliseconds(10), [&]() {
+      cm_->read();
+      cm_->update(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.01));
+      cm_->write();
+    });
+
+    executor_->add_node(cm_);
+
+    executor_spin_future_ = std::async(std::launch::async, [this]() -> void { executor_->spin(); });
+    // This sleep is needed to prevent a too fast test from ending before the
+    // executor has began to spin, which causes it to hang
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  }
+
+  // FIXME: This can be deleted!
+  void TearDown() override { executor_->cancel(); }
+
+  template <typename T>
+  std::shared_ptr<typename T::Response> call_service_and_wait(
+    rclcpp::Client<T> & client, std::shared_ptr<typename T::Request> request,
+    rclcpp::Executor & service_executor, bool update_controller_while_spinning = false)
+  {
+    EXPECT_TRUE(client.wait_for_service(std::chrono::milliseconds(500)));
+    auto result = client.async_send_request(request);
+    // Wait for the result.
+    if (update_controller_while_spinning)
+    {
+      while (service_executor.spin_until_future_complete(result, std::chrono::milliseconds(50)) !=
+             rclcpp::FutureReturnCode::SUCCESS)
+      {
+        cm_->update(rclcpp::Time(0), rclcpp::Duration::from_seconds(0.01));
+      }
+    }
+    else
+    {
+      EXPECT_EQ(
+        service_executor.spin_until_future_complete(result), rclcpp::FutureReturnCode::SUCCESS);
+    }
+    return result.get();
+  }
+
+protected:
+  rclcpp::TimerBase::SharedPtr update_timer_;
+  std::future<void> executor_spin_future_;
+};
+
+template <typename CtrlMgr>
 class ControllerManagerRunner
 {
 public:
-  explicit ControllerManagerRunner(ControllerManagerFixture * cmf)
-  : cmf_(cmf)
+  explicit ControllerManagerRunner(ControllerManagerFixture<CtrlMgr> * cmf) : cmf_(cmf)
   {
     cmf_->startCmUpdater();
   }
 
-  ~ControllerManagerRunner()
-  {
-    cmf_->stopCmUpdater();
-  }
+  ~ControllerManagerRunner() { cmf_->stopCmUpdater(); }
 
-  ControllerManagerFixture * cmf_;
+  ControllerManagerFixture<CtrlMgr> * cmf_;
 };
 
 class ControllerMock : public controller_interface::ControllerInterface

@@ -15,56 +15,45 @@
 #include <memory>
 #include <vector>
 
-#include "hardware_interface/base_interface.hpp"
 #include "hardware_interface/actuator_interface.hpp"
 
 using hardware_interface::ActuatorInterface;
-using hardware_interface::BaseInterface;
 using hardware_interface::CommandInterface;
 using hardware_interface::return_type;
 using hardware_interface::StateInterface;
-using hardware_interface::status;
 
-class TestActuator : public BaseInterface<ActuatorInterface>
+class TestActuator : public ActuatorInterface
 {
-  return_type configure(const hardware_interface::HardwareInfo & info) override
+  CallbackReturn on_init(const hardware_interface::HardwareInfo & info) override
   {
-    if (configure_default(info) != return_type::OK) {
-      return return_type::ERROR;
+    if (ActuatorInterface::on_init(info) != CallbackReturn::SUCCESS)
+    {
+      return CallbackReturn::ERROR;
     }
 
     /*
      * a hardware can optional prove for incorrect info here.
      *
      * // can only control one joint
-     * if (info_.joints.size() != 1) {return return_type::ERROR;}
+     * if (info_.joints.size() != 1) {return CallbackReturn::ERROR;}
      * // can only control in position
-     * if (info_.joints[0].command_interfaces.size() != 1) {return return_type::ERROR;}
+     * if (info_.joints[0].command_interfaces.size() != 1) {return CallbackReturn::ERROR;}
      * // can only give feedback state for position and velocity
-     * if (info_.joints[0].state_interfaces.size() != 2) {return return_type::ERROR;}
+     * if (info_.joints[0].state_interfaces.size() != 2) {return CallbackReturn::ERROR;}
     */
 
-    return return_type::OK;
+    return CallbackReturn::SUCCESS;
   }
 
   std::vector<StateInterface> export_state_interfaces() override
   {
     std::vector<StateInterface> state_interfaces;
+    state_interfaces.emplace_back(hardware_interface::StateInterface(
+      info_.joints[0].name, info_.joints[0].state_interfaces[0].name, &position_state_));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(
+      info_.joints[0].name, info_.joints[0].state_interfaces[1].name, &velocity_state_));
     state_interfaces.emplace_back(
-      hardware_interface::StateInterface(
-        info_.joints[0].name,
-        info_.joints[0].state_interfaces[0].name,
-        &position_state_));
-    state_interfaces.emplace_back(
-      hardware_interface::StateInterface(
-        info_.joints[0].name,
-        info_.joints[0].state_interfaces[1].name,
-        &velocity_state_));
-    state_interfaces.emplace_back(
-      hardware_interface::StateInterface(
-        info_.joints[0].name,
-        "some_unlisted_interface",
-        nullptr));
+      hardware_interface::StateInterface(info_.joints[0].name, "some_unlisted_interface", nullptr));
 
     return state_interfaces;
   }
@@ -72,41 +61,27 @@ class TestActuator : public BaseInterface<ActuatorInterface>
   std::vector<CommandInterface> export_command_interfaces() override
   {
     std::vector<CommandInterface> command_interfaces;
-    command_interfaces.emplace_back(
-      hardware_interface::CommandInterface(
-        info_.joints[0].name,
-        info_.joints[0].command_interfaces[0].name,
-        &velocity_command_));
+    command_interfaces.emplace_back(hardware_interface::CommandInterface(
+      info_.joints[0].name, info_.joints[0].command_interfaces[0].name, &velocity_command_));
+
+    if (info_.joints[0].command_interfaces.size() > 1)
+    {
+      command_interfaces.emplace_back(hardware_interface::CommandInterface(
+        info_.joints[0].name, info_.joints[0].command_interfaces[1].name, &max_velocity_command_));
+    }
 
     return command_interfaces;
   }
 
-  return_type start() override
-  {
-    status_ = status::STARTED;
-    return return_type::OK;
-  }
+  return_type read() override { return return_type::OK; }
 
-  return_type stop() override
-  {
-    status_ = status::STOPPED;
-    return return_type::OK;
-  }
-
-  return_type read() override
-  {
-    return return_type::OK;
-  }
-
-  return_type write() override
-  {
-    return return_type::OK;
-  }
+  return_type write() override { return return_type::OK; }
 
 private:
   double position_state_ = 0.0;
   double velocity_state_ = 0.0;
   double velocity_command_ = 0.0;
+  double max_velocity_command_ = 0.0;
 };
 
 #include "pluginlib/class_list_macros.hpp"  // NOLINT

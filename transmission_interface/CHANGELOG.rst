@@ -2,6 +2,51 @@
 Changelog for package transmission_interface
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.5.0 (2022-03-25)
+------------------
+
+2.4.0 (2022-02-23)
+------------------
+* Fix transmission loader tests (`#642 <https://github.com/ros-controls/ros2_control/issues/642>`_)
+* Contributors: Bence Magyar, Denis Štogl
+
+2.3.0 (2022-02-18)
+------------------
+* Port transmission loader plugins from ROS1 (`#633 <https://github.com/ros-controls/ros2_control/issues/633>`_)
+* Contributors: Márk Szitanics, Bence Magyar
+
+2.2.0 (2022-01-24)
+------------------
+
+2.1.0 (2022-01-11)
+------------------
+
+2.0.0 (2021-12-29)
+------------------
+* simple transmission configure multiple definition fix (`#571 <https://github.com/ros-controls/ros2_control/issues/571>`_)
+* Contributors: niiquaye
+
+1.2.0 (2021-11-05)
+------------------
+
+1.1.0 (2021-10-25)
+------------------
+
+1.0.0 (2021-09-29)
+------------------
+* Do not manually set C++ version to 14 (`#516 <https://github.com/ros-controls/ros2_control/issues/516>`_)
+* Refactor INSTANTIATE_TEST_CASE_P -> INSTANTIATE_TEST_SUITE_P (`#515 <https://github.com/ros-controls/ros2_control/issues/515>`_)
+* Contributors: Bence Magyar
+
+0.8.0 (2021-08-28)
+------------------
+* Use clang format as code formatter (`#491 <https://github.com/ros-controls/ros2_control/issues/491>`_)
+* Transmission parsing v2 (`#471 <https://github.com/ros-controls/ros2_control/issues/471>`_)
+  * move parsing responsibility to hardware_interface
+  * parse transmission type
+  * Cleanup unused parser
+* Contributors: Bence Magyar, Denis Štogl
+
 0.7.1 (2021-06-15)
 ------------------
 

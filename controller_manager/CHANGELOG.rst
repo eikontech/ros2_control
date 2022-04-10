@@ -2,6 +2,130 @@
 Changelog for package controller_manager
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.5.0 (2022-03-25)
+------------------
+* Make ControllerManager tests more flexible and reusable for different scenarios. Use more parameterized tests regarding strictness. (`#661 <https://github.com/ros-controls/ros2_control/issues/661>`_)
+* Use lifecycle nodes in controllers again (`#538 <https://github.com/ros-controls/ros2_control/issues/538>`_)
+  * Add lifecycle nodes
+  * Add custom 'configure' to controller interface to get 'update_rate' parameter.
+  * Disable external interfaces of LifecycleNode.
+* Small fixes in controller manager tests. (`#660 <https://github.com/ros-controls/ros2_control/issues/660>`_)
+* Enable controller manager services to control hardware lifecycle #abi-breaking (`#637 <https://github.com/ros-controls/ros2_control/issues/637>`_)
+  * Implement CM services for hardware lifecycle management.
+  * Added default behavior to activate all controller and added description of CM parameters.
+* Contributors: Denis Štogl, Vatan Aksoy Tezer, Bence Magyar
+
+2.4.0 (2022-02-23)
+------------------
+* Fixes of issue with seg-fault when checking interfaces on unconfigured controllers. (`#580 <https://github.com/ros-controls/ros2_control/issues/580>`_)
+* Update CM service QoS so that we don't lose service calls when using many controllers. (`#643 <https://github.com/ros-controls/ros2_control/issues/643>`_)
+* Contributors: Denis Štogl, Bence Magyar
+
+2.3.0 (2022-02-18)
+------------------
+* added a fixed control period to loop (`#647 <https://github.com/ros-controls/ros2_control/issues/647>`_)
+* install spawner/unspawner using console_script entrypoint (`#607 <https://github.com/ros-controls/ros2_control/issues/607>`_)
+* Add BEST_EFFORT in the controller switch tests. (`#582 <https://github.com/ros-controls/ros2_control/issues/582>`_)
+* Resolve unused parameter warnings (`#636 <https://github.com/ros-controls/ros2_control/issues/636>`_)
+* Contributors: Bence Magyar, Denis Štogl, Jack Center, Melvin Wang, Xi-Huang
+
+2.2.0 (2022-01-24)
+------------------
+* Resource Manager API changes for hardware lifecycle #api-breaking #abi-breaking (`#589 <https://github.com/ros-controls/ros2_control/issues/589>`_)
+  * Towards selective starting and stoping of hardware components. Cleaning and renaming.
+  * Move Lifecycle of hardware component to the bottom for better overview.
+  * Use the same nomenclature as for controllers. 'start' -> 'activate'; 'stop' -> 'deactivate'
+  * Add selective starting and stopping of hardware resources.
+  Add HardwareComponentInfo structure in resource manager.
+  Use constants for HW parameters in tests of resource_manager.
+  Add list hardware components in CM to get details about them and check their status.
+  Use clear name for 'guard' and move release cmd itfs for better readability.
+  RM: Add lock for accesing maps with stored interfaces.
+  Separate hardware components-related services after controllers-related services.
+  Add service for activate/deactive hardware components.
+  Add activation and deactivation through ResourceStorage. This helps to manage available command interfaces.
+  * Use lifecycle_msgs/State in ListHardwareCompoents for state representation.
+  * Simplify repeatable code in methods.
+  * Add HW shutdown structure into ResouceManager.
+  * Fill out service callback in CM and add parameter for auto-configure.
+  * Move claimed_command_itf_map to ResourceStorage from ResourceManager.
+  * Do not automatically configure hardware in RM.
+  * Lifecycle and claiming in Resource Manager is working.
+  * Extend controller manager to support HW lifecycle.
+  * Add also available and claimed status into list components service output.
+  * Add SetHardwareComponentState service.
+  * Make all output in services debug-output.
+  * Remove specific services for hardware lifecycle management and leave only 'set_hardware_component_state' service.
+  * Make init_resource_manager less stateful.
+  * Keep old api to start/activate all components per default.
+  * Remove 'moving'/'non-moving' interface-handling.
+  * Remove obsolete 'import_components' methods without hardware info and fix post_initialization test.
+  Co-authored-by: Bence Magyar <bence.magyar.robotics@gmail.com>
+* Contributors: Denis Štogl
+
+2.1.0 (2022-01-11)
+------------------
+
+2.0.0 (2021-12-29)
+------------------
+* Add service-skeletons for controlling hardware lifecycle. (`#585 <https://github.com/ros-controls/ros2_control/issues/585>`_)
+* fix get_update_rate visibility in windows (`#586 <https://github.com/ros-controls/ros2_control/issues/586>`_)
+* Make output of not available controller nicer and make it informational. (`#577 <https://github.com/ros-controls/ros2_control/issues/577>`_)
+* Contributors: Denis Štogl, Melvin Wang
+
+1.2.0 (2021-11-05)
+------------------
+
+1.1.0 (2021-10-25)
+------------------
+* feat: add colored output into spawner.py (`#560 <https://github.com/ros-controls/ros2_control/issues/560>`_)
+* Added timeout argument for service_caller timeout (`#552 <https://github.com/ros-controls/ros2_control/issues/552>`_)
+* controller_manager: Use command_interface_configuration for the claimed interfaces when calling list_controllers (`#544 <https://github.com/ros-controls/ros2_control/issues/544>`_)
+* Clean up test_load_controller (`#532 <https://github.com/ros-controls/ros2_control/issues/532>`_)
+* Contributors: Jack Center, Jafar Abdi, Michael, Nour Saeed
+
+1.0.0 (2021-09-29)
+------------------
+* Use ControllerManager node clock for control loop timepoints (`#542 <https://github.com/ros-controls/ros2_control/issues/542>`_)
+* Per controller update rate(`#513 <https://github.com/ros-controls/ros2_control/issues/513>`_)
+* added dt to controller interface and controller manager `#438 <https://github.com/ros-controls/ros2_control/issues/438>`_ (`#520 <https://github.com/ros-controls/ros2_control/issues/520>`_)
+* Update nomenclature in CM for better code and output understanding (`#517 <https://github.com/ros-controls/ros2_control/issues/517>`_)
+* Methods controlling the lifecycle of controllers all have on\_ prefix
+* Controller Manager should not crash when trying to start finalized or unconfigured controller (`#461 <https://github.com/ros-controls/ros2_control/issues/461>`_)
+* Fix deprecation warning from rclcpp::Duration (`#511 <https://github.com/ros-controls/ros2_control/issues/511>`_)
+* Remove BOOST compiler definitions for pluginlib from CMakeLists (`#514 <https://github.com/ros-controls/ros2_control/issues/514>`_)
+* Do not manually set C++ version to 14 (`#516 <https://github.com/ros-controls/ros2_control/issues/516>`_)
+* Refactor INSTANTIATE_TEST_CASE_P -> INSTANTIATE_TEST_SUITE_P (`#515 <https://github.com/ros-controls/ros2_control/issues/515>`_)
+  Also removed the duplicated format & compiler fixes as on Galactic this shouldn't be an issue
+* rename get_current_state() to get_state() (`#512 <https://github.com/ros-controls/ros2_control/issues/512>`_)
+* Fix spawner tests (`#509 <https://github.com/ros-controls/ros2_control/issues/509>`_)
+* Removed deprecated CLI verbs (`#420 <https://github.com/ros-controls/ros2_control/issues/420>`_)
+* Remove extensions from executable nodes (`#453 <https://github.com/ros-controls/ros2_control/issues/453>`_)
+* Contributors: Bence Magyar, Denis Štogl, Dmitri Ignakov, Joseph Schornak, Márk Szitanics, Tim Clephas, bailaC, Mathias Aarbo
+
+0.8.0 (2021-08-28)
+------------------
+* Use clang format as code formatter (`#491 <https://github.com/ros-controls/ros2_control/issues/491>`_)
+* Use example urdf from the test_assests package. (`#495 <https://github.com/ros-controls/ros2_control/issues/495>`_)
+* Separate controller manager test cases (`#476 <https://github.com/ros-controls/ros2_control/issues/476>`_)
+* Add Controller Manager docs (`#467 <https://github.com/ros-controls/ros2_control/issues/467>`_)
+* sort interfaces in resource manager (`#483 <https://github.com/ros-controls/ros2_control/issues/483>`_)
+* Add pre-commit setup. (`#473 <https://github.com/ros-controls/ros2_control/issues/473>`_)
+* Make controller_manager set controller's use_sim_time param when use_sim_time=True (`#468 <https://github.com/ros-controls/ros2_control/issues/468>`_)
+  * potential solution to controller_manager use_sim_time sharing issue
+  * removed debug print statements
+  * added INFO message to warn user that use_sim_time is being set automatically
+* Add load-only option into controller spawner (`#427 <https://github.com/ros-controls/ros2_control/issues/427>`_)
+* Fixes for windows (`#443 <https://github.com/ros-controls/ros2_control/issues/443>`_)
+  * Fix building on windows
+  * Fix MSVC linker error when building tests
+  * Fix hang when loading controller on windows
+  * Use better log for configuring controller
+  * Be consistent with visibility control
+  * Use try_lock throw exception on failure
+* Add an argument to define controller manager timeout (`#444 <https://github.com/ros-controls/ros2_control/issues/444>`_)
+* Contributors: Akash, Bence Magyar, Darko Lukić, Denis Štogl, Karsten Knese, Simon Honigmann
+
 0.7.1 (2021-06-15)
 ------------------
 * Use namespace in controller_manager (`#435 <https://github.com/ros-controls/ros2_control/issues/435>`_)
